@@ -1,0 +1,68 @@
+name: Build Android (Test)
+
+on:
+  workflow_dispatch:        # 手动触发
+  push:
+    branches:
+      - main                # 也可以换成你常用的开发分支
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # 原项目依赖 Go，需要提前装好
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'
+          cache-dependency-path: core/go.sum
+
+      # Flutter 稳定版（与原配置一致）
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.41.9
+          cache: true
+
+      # NDK 是 Android 编译必需的
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28c
+          add-to-path: true
+          link-to-sdk: true
+
+      # 获取依赖
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      # ============================================================
+      # 签名配置（若你已经有签名文件及对应的 Secrets，取消注释以下部分）
+      # 若没有，则跳过，此时构建的是 **debug** 版本（无需签名）
+      # ============================================================
+      # - name: Setup Android Signing
+      #   run: |
+      #     echo "${{ secrets.KEYSTORE }}" | base64 --decode > android/app/keystore.jks
+      #     echo "${{ secrets.SERVICE_JSON }}" | base64 --decode > android/app/google-services.json
+      #     echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/local.properties
+      #     echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> android/local.properties
+      #     echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/local.properties
+
+      # 原项目的构建脚本（此脚本会处理 native 代码编译、资源复制等）
+      # 这里显式指定平台为 android，并加上 --debug 确保生成调试包
+      - name: Build Android APK
+        run: dart setup.dart android --debug -v
+
+      # 上传产物（假设脚本会把输出放到 ./dist 目录，与原工作流一致）
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-apk
+          path: ./dist
+          overwrite: true
