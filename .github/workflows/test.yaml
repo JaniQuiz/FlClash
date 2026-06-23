@@ -2,9 +2,6 @@ name: Build Android (Test)
 
 on:
   workflow_dispatch:        # 手动触发
-  push:
-    branches:
-      - main                # 也可以换成你常用的开发分支
 
 jobs:
   build-android:
